@@ -210,6 +210,11 @@ export async function run(args: string[]): Promise<void> {
     } else {
       await handlePairingCode(projectRoot, statusFile, phone);
     }
+    // Give auth subprocess time to close the WA socket gracefully before killing it
+    await new Promise<void>((resolve) => {
+      const t = setTimeout(resolve, 5000);
+      authProc.once('exit', () => { clearTimeout(t); resolve(); });
+    });
   } finally {
     cleanup();
     process.removeListener('exit', cleanup);

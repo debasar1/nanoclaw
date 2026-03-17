@@ -365,6 +365,7 @@ async function runQuery(
   let lastAssistantUuid: string | undefined;
   let messageCount = 0;
   let resultCount = 0;
+  let rateLimitNotified = false;
 
   // Load global CLAUDE.md as additional system context (shared across all groups)
   const globalClaudeMdPath = '/workspace/global/CLAUDE.md';
@@ -435,6 +436,20 @@ async function runQuery(
 
     if (message.type === 'assistant' && 'uuid' in message) {
       lastAssistantUuid = (message as { uuid: string }).uuid;
+    }
+
+    if (message.type === 'rate_limit_event') {
+      const rl = message as { retrySecs?: number };
+      const waitSec = rl.retrySecs ?? 60;
+      log(`Rate limit hit, SDK will retry in ~${waitSec}s`);
+      if (!rateLimitNotified) {
+        rateLimitNotified = true;
+        writeOutput({
+          status: 'success',
+          result: `⏳ API rate limit reached. Your request is queued and will be processed in ~${waitSec}s...`,
+          newSessionId,
+        });
+      }
     }
 
     if (message.type === 'system' && message.subtype === 'init') {

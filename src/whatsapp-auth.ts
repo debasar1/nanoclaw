@@ -49,6 +49,7 @@ async function connectSocket(
   phoneNumber?: string,
   isReconnect = false,
 ): Promise<void> {
+  let closing = false;
   const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
 
   if (state.creds.registered && !isReconnect) {
@@ -111,6 +112,7 @@ async function connectSocket(
     }
 
     if (connection === 'close') {
+      if (closing) return;
       const reason = (lastDisconnect?.error as any)?.output?.statusCode;
 
       if (reason === DisconnectReason.loggedOut) {
@@ -143,8 +145,12 @@ async function connectSocket(
       console.log('  Credentials saved to store/auth/');
       console.log('  You can now start the NanoClaw service.\n');
 
-      // Give it a moment to save credentials, then exit
-      setTimeout(() => process.exit(0), 1000);
+      // Give creds.update time to fire and write, then close gracefully
+      setTimeout(() => {
+        closing = true;
+        sock.end(undefined);
+        setTimeout(() => process.exit(0), 500);
+      }, 3000);
     }
   });
 
